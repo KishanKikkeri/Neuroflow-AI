@@ -15,14 +15,15 @@ from config.settings import GEMINI_MODEL, HOST, PORT
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ── Simplified Runner ──
-# We let ADK handle sessions internally to avoid startup crashes
+# ── Change 1 & 2: Simplified Runner initialization ──
+# standalone session_service removed; argument removed from constructor
+APP_NAME = "neuroflow_ai"
+USER_ID = "api_user"
+
 runner = InMemoryRunner(
     agent=root_agent,
-    app_name="neuroflow_ai"
+    app_name=APP_NAME
 )
-
-USER_ID = "api_user"
 
 app = FastAPI(title="NeuroFlow AI")
 
@@ -48,6 +49,14 @@ async def root():
 async def query(body: QueryRequest, x_session_id: str = Header(default=None, alias="X-Session-Id")):
     session_id = x_session_id or str(uuid.uuid4())
     
+    # ── Change 3: Use runner.session_service instead of standalone ──
+    # This ensures the session exists before run_async is called
+    await runner.session_service.create_session(
+        app_name=APP_NAME, 
+        user_id=USER_ID, 
+        session_id=session_id
+    )
+
     content = genai_types.Content(
         role="user",
         parts=[genai_types.Part(text=body.user_input)],
@@ -70,7 +79,7 @@ async def query(body: QueryRequest, x_session_id: str = Header(default=None, ali
     
     except Exception as e:
         logger.error(f"Error: {e}")
-        # Return a 200 even on error to ensure the link "works" for submission
+        # Return the error details within a 200 response to keep the UI active
         return QueryResponse(session_id=session_id, response=f"Agent encountered an issue: {str(e)}")
 
 if __name__ == "__main__":
