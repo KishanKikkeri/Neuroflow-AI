@@ -1,7 +1,7 @@
 # NeuroFlow AI 🧠
 
 A production-ready **multi-agent AI system** built with **Google ADK**, **Gemini 2.5 Flash**,
-**AlloyDB**, and **Google Calendar MCP** — deployable on **Google Cloud Run**.
+**Firestore**, and **Google Calendar MCP** — deployable on **Google Cloud Run**.
 
 ---
 
@@ -29,7 +29,7 @@ User Request (HTTP)
       └──┬───┘ └──┬───┘ └───┬───┘ └──────┬───────┘
          │        │          │             │
          ▼        ▼          ▼             ▼
-    AlloyDB   AlloyDB   Calendar MCP   AlloyDB +
+    Firestore   Firestore   Calendar MCP   Firestore +
     (tasks)   (notes)   (StreamHTTP)   Calendar MCP +
                                        Weather API
 ```
@@ -39,10 +39,10 @@ User Request (HTTP)
 | Agent | Responsibility | Data Source |
 |-------|----------------|-------------|
 | `NeuroFlowCoordinator` | Intent detection, routing, multi-step orchestration | — |
-| `TaskAgent` | Add / list / update tasks | AlloyDB `tasks` table |
-| `NotesAgent` | Save / retrieve notes | AlloyDB `notes` table |
+| `TaskAgent` | Add / list / update tasks | Firestore `tasks` table |
+| `NotesAgent` | Save / retrieve notes | Firestore `notes` table |
 | `CalendarAgent` | Create / fetch calendar events | Google Calendar MCP |
-| `SmartDayPlannerAgent` | Unified daily plan synthesis | AlloyDB + Calendar MCP + Weather |
+| `SmartDayPlannerAgent` | Unified daily plan synthesis | Firestore + Calendar MCP + Weather |
 
 ---
 
@@ -58,7 +58,7 @@ neuroflow_ai/
 │       └── tools.py         # FunctionTools wiring DB calls
 │
 ├── database/
-│   ├── db.py                # AlloyDB connection pool + CRUD
+│   ├── db.py                # Firestore connection pool + CRUD
 │   └── schema.sql           # One-time schema creation script
 │
 ├── tools/
@@ -85,7 +85,7 @@ neuroflow_ai/
 |------|---------|---------|
 | Python | 3.12+ | Runtime |
 | Google Cloud SDK (`gcloud`) | latest | Auth + deployment |
-| AlloyDB / PostgreSQL | 15+ | Structured data |
+| Firestore / PostgreSQL | 15+ | Structured data |
 | Google ADK | 1.0+ | Agent framework |
 | Docker | 24+ | Container build |
 
@@ -112,7 +112,7 @@ cp .env.example .env
 # Edit .env and fill in all values (see .env.example for descriptions)
 ```
 
-### 3. Set up AlloyDB / PostgreSQL
+### 3. Set up Firestore / PostgreSQL
 
 **Option A — Local PostgreSQL (for development):**
 ```bash
@@ -121,7 +121,7 @@ psql -U postgres -c "CREATE DATABASE neuroflow;"
 psql -U postgres -d neuroflow -f database/schema.sql
 ```
 
-**Option B — AlloyDB via Cloud SQL Auth Proxy:**
+**Option B — Firestore via Cloud SQL Auth Proxy:**
 ```bash
 # Download: https://cloud.google.com/sql/docs/postgres/connect-auth-proxy
 ./cloud-sql-proxy \
@@ -345,11 +345,11 @@ gcloud run deploy "${SERVICE_NAME}" \
   --set-env-vars "GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
   --set-env-vars "GOOGLE_CLOUD_LOCATION=${REGION}" \
   --set-env-vars "GEMINI_MODEL=gemini-2.5-flash" \
-  --set-env-vars "ALLOYDB_HOST=127.0.0.1" \
-  --set-env-vars "ALLOYDB_PORT=5432" \
-  --set-env-vars "ALLOYDB_USER=postgres" \
-  --set-env-vars "ALLOYDB_DATABASE=neuroflow" \
-  --set-secrets "ALLOYDB_PASSWORD=alloydb-password:latest" \
+  --set-env-vars "Firestore_HOST=127.0.0.1" \
+  --set-env-vars "Firestore_PORT=5432" \
+  --set-env-vars "Firestore_USER=postgres" \
+  --set-env-vars "Firestore_DATABASE=neuroflow" \
+  --set-secrets "Firestore_PASSWORD=Firestore-password:latest" \
   --set-secrets "GOOGLE_API_KEY=gemini-api-key:latest" \
   --set-secrets "OPENWEATHER_API_KEY=openweather-api-key:latest" \
   --set-env-vars "CALENDAR_MCP_URL=https://calendar-mcp-server-<hash>-uc.a.run.app/mcp"
@@ -357,7 +357,7 @@ gcloud run deploy "${SERVICE_NAME}" \
 
 > **Tip:** Use `--set-secrets` for sensitive values — they're pulled from Secret Manager at runtime.
 
-### 4. Connect AlloyDB via Cloud SQL connector (Cloud Run)
+### 4. Connect Firestore via Cloud SQL connector (Cloud Run)
 
 Add the `--add-cloudsql-instances` flag and use the Unix socket path:
 
@@ -365,7 +365,7 @@ Add the `--add-cloudsql-instances` flag and use the Unix socket path:
 gcloud run deploy "${SERVICE_NAME}" \
   ... \
   --add-cloudsql-instances "${PROJECT_ID}:${REGION}:neuroflow-instance" \
-  --set-env-vars "ALLOYDB_HOST=/cloudsql/${PROJECT_ID}:${REGION}:neuroflow-instance"
+  --set-env-vars "Firestore_HOST=/cloudsql/${PROJECT_ID}:${REGION}:neuroflow-instance"
 ```
 
 ### 5. Test the deployed service
@@ -402,11 +402,11 @@ with the NeuroFlowCoordinator and watch agent transfers happen in real time.
 | `GOOGLE_CLOUD_LOCATION` | ✅ | Region e.g. `us-central1` |
 | `GOOGLE_API_KEY` | local dev | Gemini API key (Cloud Run uses ADC) |
 | `GEMINI_MODEL` | ✅ | e.g. `gemini-2.5-flash` |
-| `ALLOYDB_HOST` | ✅ | DB host or Unix socket |
-| `ALLOYDB_PORT` | ✅ | Default `5432` |
-| `ALLOYDB_USER` | ✅ | Database user |
-| `ALLOYDB_PASSWORD` | ✅ | Database password |
-| `ALLOYDB_DATABASE` | ✅ | Database name e.g. `neuroflow` |
+| `Firestore_HOST` | ✅ | DB host or Unix socket |
+| `Firestore_PORT` | ✅ | Default `5432` |
+| `Firestore_USER` | ✅ | Database user |
+| `Firestore_PASSWORD` | ✅ | Database password |
+| `Firestore_DATABASE` | ✅ | Database name e.g. `neuroflow` |
 | `CALENDAR_MCP_URL` | ✅ | Full URL to Calendar MCP server |
 | `OPENWEATHER_API_KEY` | optional | OpenWeatherMap API key |
 | `WEATHER_CITY` | optional | Default city for weather |
@@ -429,6 +429,6 @@ with the NeuroFlowCoordinator and watch agent transfers happen in real time.
 - Use **Secret Manager** for all secrets in Cloud Run (`--set-secrets`)
 - The Cloud Run service account needs:
   - `roles/aiplatform.user` (Vertex AI / Gemini)
-  - `roles/cloudsql.client` (AlloyDB)
+  - `roles/cloudsql.client` (Firestore)
   - `roles/calendar.events` (via OAuth, handled by ADC)
 - Tighten `allow_origins` in `CORSMiddleware` for production
